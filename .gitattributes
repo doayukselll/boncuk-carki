@@ -1,0 +1,5 @@
+* text=auto
+*.png binary
+# kabuk betikleri Mac/Linux için LF kalmalı
+gradlew text eol=lf
+*.sh text eol=lf

@@ -1,0 +1,13 @@
+{
+  "appId": "com.boncukcarki.app",
+  "appName": "Boncuk Çarkı",
+  "webDir": "www",
+  "backgroundColor": "#0f1b2e",
+  "android": {
+    "backgroundColor": "#0f1b2e"
+  },
+  "ios": {
+    "backgroundColor": "#0f1b2e",
+    "contentInset": "never"
+  }
+}

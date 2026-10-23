@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Boncuk Çarkı</string>
+    <string name="title_activity_main">Boncuk Çarkı</string>
+    <string name="package_name">com.boncukcarki.app</string>
+    <string name="custom_url_scheme">com.boncukcarki.app</string>
+</resources>
