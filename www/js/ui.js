@@ -46,23 +46,30 @@ function drawGoals() {
 function buildMenu() {
   const el = $('levels');
   el.innerHTML = '';
+  let current = null;   // açık olup henüz geçilmemiş ilk bölüm
   LEVELS.forEach((lv, i) => {
     const b = document.createElement('button');
     const open = i === 0 || stars[i - 1] > 0;
     const st = stars[i] || 0;
     b.innerHTML = open ? `${i + 1}<small>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</small>` : '🔒';
     b.disabled = !open;
+    if (open && !st && !current) { current = b; b.classList.add('current'); }
     b.title = lv.goals.map(goalText).join(', ');
     b.addEventListener('click', () => requestStart(i));
     el.appendChild(b);
   });
+  return current;
 }
 function showMenu() {
   $('over').classList.remove('show');
-  buildMenu();
+  const current = buildMenu();
   const sv = loadSave();
   $('resumeBtn').hidden = !sv;
   if (sv) $('resumeBtn').innerHTML = '▶ Devam et<small>' +
     (sv.mode === 'level' ? `Bölüm ${sv.levelIdx + 1}` : `Sonsuz mod · ${sv.st.score} puan`) + '</small>';
   $('menu').classList.add('show');
+  // bölüm çoksa sıradaki bölüm görünsün diye oraya kaydır
+  $('menu').scrollTop = 0;
+  if (current && current.offsetTop > $('menu').clientHeight * 0.6)
+    $('menu').scrollTop = current.offsetTop - $('menu').clientHeight / 2;
 }
