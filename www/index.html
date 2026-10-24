@@ -82,6 +82,7 @@
   .goal { display: flex; align-items: center; gap: 6px; background: var(--panel); border-radius: 999px; padding: 4px 10px 4px 4px; font-size: 14px; }
   .goal.done { outline: 2px solid #5aa83c; }
   .goal .dot { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+  .goal .dot.sym { color: rgba(0,0,0,0.5); font-size: 11px; line-height: 1; }
   .goal .dot.shell { background: rgba(200,190,170,0.25); border: 3px solid #9a8f7a; }
   .goal .dot.star { background: transparent; color: var(--accent); font-size: 16px; }
   #menu {
@@ -93,6 +94,10 @@
   #menu h1 { font-size: 32px; }
   #menu .sub { color: var(--muted); margin: -10px 0 0; font-size: 14px; }
   #menu .endless { font-size: 18px; padding: 12px 28px; }
+  #resumeBtn small { display: block; font-size: 12px; opacity: 0.75; }
+  #resumeBtn ~ #endlessBtn { background: var(--panel); color: var(--text); border: 1px solid rgba(255,255,255,0.15); }
+  #resumeBtn[hidden] ~ #endlessBtn { background: var(--accent); color: #1a1a1a; border: 0; }
+  #over { z-index: 10; }  /* menünün üstünde de açılabilsin (yeni oyun onayı) */
   #menu h3 { margin: 6px 0 0; color: var(--muted); font-weight: 600; font-size: 14px; letter-spacing: 1px; }
   #levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; width: 100%; max-width: 380px; }
   #levels button { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; font-size: 20px; font-weight: 700; }
@@ -134,6 +139,7 @@
 <div id="menu">
   <h1>BONCUK ÇARKI</h1>
   <p class="sub">Halkaları çevir, renkleri hizala.</p>
+  <button class="endless primary" id="resumeBtn"></button>
   <button class="endless primary" id="endlessBtn">∞ Sonsuz mod</button>
   <h3>BÖLÜMLER</h3>
   <div id="levels"></div>
@@ -145,9 +151,12 @@ const S = 8;          // her halkadaki yuva sayısı
 const COLORS = ['#e04b3c', '#20b2aa', '#f2b632', '#5aa83c', '#8e5bc9', '#f07c2a', '#e86aa6'];
 const JOKER = -1;
 const JOKER_CHANCE = 0.04;
+const DANGER_FREE = 2;   // dış halkada bu kadar ya da daha az boşluk kalınca uyar
 const COLOR_STEPS = [0, 400, 1200, 2500];  // puan eşikleri: 4, 5, 6, 7 renk
 
 const COLOR_NAMES = ['kırmızı', 'turkuaz', 'sarı', 'yeşil', 'mor', 'turuncu', 'pembe'];
+// renk körlüğü için her rengin sembolü (boncukta çizilen şeklin metin karşılığı)
+const COLOR_SYMBOLS = ['▲', '■', '●', '◆', '✚', '★', '◯'];
 
 // engeller: hangi hamleden itibaren, ne sıklıkla, kaç hamle sürer
 const ENDLESS_CFG = {
@@ -185,10 +194,11 @@ const nctx = nextc.getContext('2d');
 const $ = id => document.getElementById(id);
 
 let grid, offs, queue, score, moves, undos, history, busy, gameOver, particles, nid;
-let locks, link, shake, seen;   // locks[r] = kalan kilit hamlesi; link = { r, t } → r ile r+1 ters bağlı
+let warned = false;             // "dolmak üzere" uyarısı gösterildi mi (tahta rahatlayınca sıfırlanır)
+let locks, link, shake, seen;   //locks[r] = kalan kilit hamlesi; link = { r, t } → r ile r+1 ters bağlı
 let mode = 'endless', levelIdx = 0, level = null, cfg = ENDLESS_CFG;
 let progress = [];              // bölüm hedeflerinin sayaçları (hedef sırasıyla)
-let best = 0, stars = [];
+let best = 0, bestAtStart = 0, stars = [];
 try { best = +localStorage.getItem('boncuk_best') || 0; } catch (e) {}
 try { stars = JSON.parse(localStorage.getItem('boncuk_stars')) || []; } catch (e) {}
 
@@ -222,6 +232,7 @@ function startGame(idx) {
   cfg = level ? levelCfg(level) : ENDLESS_CFG;
   progress = level ? level.goals.map(() => 0) : [];
   $('menu').classList.remove('show');
+  clearSave();
   newGame();
   if (level) floatText(`Bölüm ${levelIdx + 1}`, '#9fd3ff');
 }
@@ -231,8 +242,8 @@ function newGame() {
   grid = Array.from({ length: N }, () => Array(S).fill(null));
   offs = Array(N).fill(0);
   locks = Array(N).fill(0); link = null; shake = Array(N).fill(0); seen = {};
-  score = 0; moves = 0; undos = 3; history = [];
-  busy = false; gameOver = false; particles = [];
+  score = 0; moves = 0; undos = 3; history = []; bestAtStart = best;
+  busy = false; gameOver = false; particles = []; warned = false;
   // başlangıç: iç iki halka dolu, üçüncü yarı dolu; hazır eşleşme olmasın
   for (let s = 0; s < S; s++) {
     const h = s % 2 === 0 ? 3 : 2;
@@ -260,6 +271,46 @@ function restore(st) {
   queue = st.queue.slice(); score = st.score; moves = st.moves; progress = st.progress.slice();
   locks = st.locks.slice(); link = st.link ? { ...st.link } : null;
   offs = Array(N).fill(0);
+}
+
+// ---------- kayıt: süren oyun her hamleden sonra saklanır, menüden devam edilir ----------
+
+function saveGame() {
+  if (gameOver || moves === 0) { clearSave(); return; }
+  const sv = { mode, levelIdx, st: snapshot(), undos, history, seen, bestAtStart };
+  try { localStorage.setItem('boncuk_save', JSON.stringify(sv)); } catch (e) {}
+}
+function loadSave() {
+  try { return JSON.parse(localStorage.getItem('boncuk_save')); } catch (e) { return null; }
+}
+function clearSave() {
+  try { localStorage.removeItem('boncuk_save'); } catch (e) {}
+}
+
+function resumeGame() {
+  const sv = loadSave();
+  if (!sv) return;
+  mode = sv.mode; levelIdx = sv.levelIdx;
+  level = mode === 'level' ? LEVELS[levelIdx] : null;
+  cfg = level ? levelCfg(level) : ENDLESS_CFG;
+  $('menu').classList.remove('show');
+  newGame();
+  try {
+    restore(sv.st);
+    undos = sv.undos; history = sv.history; seen = sv.seen; bestAtStart = sv.bestAtStart;
+  } catch (e) {   // bozuk ya da eski biçimli kayıt: yeni oyunla devam
+    clearSave();
+    progress = level ? level.goals.map(() => 0) : [];
+    newGame();
+  }
+  updateUI();
+}
+
+// kayıtlı oyun varken yeni oyun başlatmadan önce sor
+function requestStart(idx) {
+  if (!loadSave()) { startGame(idx); return; }
+  showResult('Yeni oyun başlasın mı?', null, 'Kayıtlı oyunun silinecek.',
+    'Yeni oyun', () => startGame(idx), 'Vazgeç');
 }
 
 // ters bağlı halkanın eşi (yoksa -1)
@@ -305,6 +356,11 @@ function spawnObstacles() {
 }
 
 function updateUI() {
+  // rekor anında kaydedilir: oyun yarıda bırakılsa ya da uygulama kapansa da kaybolmaz
+  if (!level && score > best) {
+    best = score;
+    try { localStorage.setItem('boncuk_best', best); } catch (e) {}
+  }
   $('score').textContent = score;
   $('best').textContent = best;
   $('moves').textContent = level ? level.moves - moves : moves;
@@ -335,7 +391,7 @@ function drawGoals() {
   el.innerHTML = `<span class="lvl">Bölüm ${levelIdx + 1}</span>` + level.goals.map((g, i) => {
     const v = Math.min(goalValue(i), g.n);
     let dot;
-    if (g.type === 'color') dot = `<span class="dot" style="background:${COLORS[g.c]}"></span>`;
+    if (g.type === 'color') dot = `<span class="dot sym" style="background:${COLORS[g.c]}">${COLOR_SYMBOLS[g.c]}</span>`;
     else if (g.type === 'crack') dot = `<span class="dot shell"></span>`;
     else dot = `<span class="dot star">★</span>`;
     return `<span class="goal${v >= g.n ? ' done' : ''}">${dot}${v} / ${g.n}</span>`;
@@ -352,13 +408,17 @@ function buildMenu() {
     b.innerHTML = open ? `${i + 1}<small>${'★'.repeat(st)}${'☆'.repeat(3 - st)}</small>` : '🔒';
     b.disabled = !open;
     b.title = lv.goals.map(goalText).join(', ');
-    b.addEventListener('click', () => startGame(i));
+    b.addEventListener('click', () => requestStart(i));
     el.appendChild(b);
   });
 }
 function showMenu() {
   $('over').classList.remove('show');
   buildMenu();
+  const sv = loadSave();
+  $('resumeBtn').hidden = !sv;
+  if (sv) $('resumeBtn').innerHTML = '▶ Devam et<small>' +
+    (sv.mode === 'level' ? `Bölüm ${sv.levelIdx + 1}` : `Sonsuz mod · ${sv.st.score} puan`) + '</small>';
   $('menu').classList.add('show');
 }
 
@@ -477,7 +537,11 @@ async function afterMove(snap) {
     if (goalsDone()) { winLevel(); return; }
     if (moves >= level.moves) { endGame('Hamle bitti!'); return; }
   }
-  if (isFull()) floatText('Çark dolu! Bir eşleşme yap!', '#ff8a7a');
+  const free = outerFree();
+  if (!free) floatText('Çark dolu! Bir eşleşme yap!', '#ff8a7a');
+  else if (free <= DANGER_FREE && !warned) floatText('Dikkat: çark dolmak üzere!', '#ff8a7a');
+  warned = free <= DANGER_FREE;
+  saveGame();
 }
 
 // sonsuz modda yavaş akış; bölümlerde hedefe yetecek kadar boncuk gelsin diye tahta seyrekse daha çok
@@ -488,12 +552,15 @@ function spawnCount() {
   return Math.max(2, Math.min(4, 20 - filled));
 }
 
-function isFull() {
-  for (let s = 0; s < S; s++) if (!grid[N - 1][s]) return false;
-  return true;
+// dış halkadaki boş yuva sayısı; 0 ise bir sonraki girişte oyun biter
+function outerFree() {
+  let n = 0;
+  for (let s = 0; s < S; s++) if (!grid[N - 1][s]) n++;
+  return n;
 }
 
-function showResult(title, starCount, text, mainLabel, mainAction) {
+function showResult(title, starCount, text, mainLabel, mainAction, menuLabel = 'Menü') {
+  $('overMenu').textContent = menuLabel;
   $('overTitle').textContent = title;
   $('overStars').textContent = starCount === null ? '' : '★'.repeat(starCount) + '☆'.repeat(3 - starCount);
   $('finalText').textContent = text;
@@ -504,6 +571,7 @@ function showResult(title, starCount, text, mainLabel, mainAction) {
 
 function endGame(title = 'Çark doldu!') {
   gameOver = true; busy = false;
+  clearSave();
   sfx.lose();
   updateUI();
   if (level) {
@@ -511,13 +579,13 @@ function endGame(title = 'Çark doldu!') {
     showResult(title, null, `Hedefe ${left} kaldı. Bir daha dene!`, 'Tekrar dene', () => startGame(levelIdx));
     return;
   }
-  if (score > best) { best = score; try { localStorage.setItem('boncuk_best', best); } catch (e) {} }
-  showResult(title, null, `Puan: ${score} · Hamle: ${moves} · Rekor: ${best}`, 'Tekrar oyna', () => startGame());
-  updateUI();
+  const record = score > bestAtStart ? ' · Yeni rekor!' : ` · Rekor: ${best}`;
+  showResult(title, null, `Puan: ${score} · Hamle: ${moves}${record}`, 'Tekrar oyna', () => startGame());
 }
 
 function winLevel() {
   gameOver = true; busy = false;
+  clearSave();
   const ratio = (level.moves - moves) / level.moves;
   const st = ratio >= 0.3 ? 3 : ratio >= 0.1 ? 2 : 1;
   stars[levelIdx] = Math.max(stars[levelIdx] || 0, st);
@@ -751,11 +819,47 @@ function drawBead(ctx, c, x, y, r, alpha = 1) {
     g.addColorStop(1, shade(COLORS[c], -0.35));
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fillStyle = g; ctx.fill();
-    // boncuk deliği
-    ctx.beginPath(); ctx.arc(x, y, r * 0.16, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill();
+    drawSymbol(ctx, c, x, y, r * 0.42);
   }
   ctx.restore();
+}
+
+// rengi şekille de belli eden işaret; s = yarıçap
+function drawSymbol(ctx, c, x, y, s) {
+  ctx.fillStyle = 'rgba(0,0,0,0.42)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.42)';
+  ctx.beginPath();
+  switch (c) {
+    case 0:   // üçgen
+      ctx.moveTo(x, y - s); ctx.lineTo(x + s * 0.92, y + s * 0.65); ctx.lineTo(x - s * 0.92, y + s * 0.65);
+      break;
+    case 1:   // kare
+      ctx.rect(x - s * 0.72, y - s * 0.72, s * 1.44, s * 1.44);
+      break;
+    case 2:   // dolu daire
+      ctx.arc(x, y, s * 0.7, 0, Math.PI * 2);
+      break;
+    case 3:   // eşkenar dörtgen
+      ctx.moveTo(x, y - s); ctx.lineTo(x + s * 0.75, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s * 0.75, y);
+      break;
+    case 4:   // artı
+      ctx.rect(x - s, y - s * 0.3, s * 2, s * 0.6);
+      ctx.rect(x - s * 0.3, y - s, s * 0.6, s * 2);
+      break;
+    case 5:   // yıldız
+      for (let i = 0; i < 10; i++) {
+        const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? s * 0.45 : s;
+        ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      break;
+    case 6:   // halka
+      ctx.lineWidth = s * 0.38;
+      ctx.arc(x, y, s * 0.68, 0, Math.PI * 2);
+      ctx.stroke();
+      return;
+  }
+  ctx.closePath();
+  ctx.fill();
 }
 
 function shade(hex, f) {
@@ -787,6 +891,20 @@ function draw() {
     ctx.fillStyle = active ? 'rgba(242,182,50,0.16)' : (r % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)');
     ctx.fill();
     ctx.strokeStyle = 'rgba(244,234,213,0.18)'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  // dış halka dolmak üzere: nabız gibi atan kırmızı bant ve boş yuvalarda halka
+  const free = outerFree();
+  if (!gameOver && free <= DANGER_FREE) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+    ctx.beginPath();
+    ctx.arc(cx, cy, hub + N * w, 0, Math.PI * 2);
+    ctx.arc(cx, cy, hub + (N - 1) * w, 0, Math.PI * 2, true);
+    ctx.fillStyle = `rgba(224,75,60,${0.12 + 0.18 * pulse})`; ctx.fill();
+    ctx.strokeStyle = `rgba(255,138,122,${0.4 + 0.5 * pulse})`; ctx.lineWidth = 2;
+    for (let s = 0; s < S; s++) if (!grid[N - 1][s]) {
+      const a = (s + offs[N - 1]) * 2 * Math.PI / S - Math.PI / 2, rad = hub + (N - 0.5) * w;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, geo.br, 0, Math.PI * 2); ctx.stroke();
+    }
   }
   // kilitli halkalar: koyu bant
   for (let r = 0; r < N; r++) if (locks[r] > 0) {
@@ -962,9 +1080,12 @@ $('undo').addEventListener('click', () => {
   undos--;
   restore(history.pop());
   updateUI();
+  saveGame();
 });
 $('overMenu').addEventListener('click', showMenu);
+// süren oyun her hamleden sonra kaydedildiği için menüye dönmek bir şey kaybettirmez
 $('menuBtn').addEventListener('click', () => { if (!busy) showMenu(); });
+$('resumeBtn').addEventListener('click', resumeGame);
 $('soundBtn').addEventListener('click', () => {
   muted = !muted;
   try { localStorage.setItem('boncuk_muted', muted ? '1' : '0'); } catch (e) {}
@@ -977,7 +1098,7 @@ updateSoundBtn();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !haptics) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-$('endlessBtn').addEventListener('click', () => startGame());
+$('endlessBtn').addEventListener('click', () => requestStart());
 window.addEventListener('resize', resize);
 
 newGame();
