@@ -132,7 +132,7 @@ function requestStart(idx) {
 function partnerOf(r) {
   if (!link) return -1;
   if (link.r === r) return r + 1;
-  if (link.r + 1 === r) return r;
+  if (link.r + 1 === r) return r - 1;
   return -1;
 }
 
