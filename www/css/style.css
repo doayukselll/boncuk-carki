@@ -72,6 +72,7 @@ button.primary:active:not(:disabled) { box-shadow: 0 1px 0 var(--gold-edge), ins
   #undo .lbl { display: none; }
 }
 .barRight { display: flex; gap: 6px; }
+#hintBtn.off { opacity: 0.4; filter: grayscale(1); }
 
 /* sayaç/çip değişince kısa bir zıplama */
 .bump { animation: bump 0.32s cubic-bezier(.3,1.6,.5,1); }

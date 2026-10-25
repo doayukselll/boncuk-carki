@@ -1,6 +1,6 @@
 // Çevrimdışı çalışma: dosyalar ilk açılışta önbelleğe alınır.
 // Oyunu güncellediğinde VERSION'ı artır; telefonlar yeni sürümü bir sonraki açılışta alır.
-const VERSION = 'boncuk-v6';
+const VERSION = 'boncuk-v7';
 const FILES = [
   './',
   './index.html',

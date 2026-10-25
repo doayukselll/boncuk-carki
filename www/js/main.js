@@ -70,6 +70,14 @@ $('soundBtn').addEventListener('click', () => {
   sfx.snap();
 });
 updateSoundBtn();
+$('hintBtn').addEventListener('click', () => {
+  hintsOn = !hintsOn;
+  try { localStorage.setItem('boncuk_hints', hintsOn ? '1' : '0'); } catch (e) {}
+  resetHint();
+  updateHintBtn();
+  floatText(hintsOn ? 'İpuçları açık' : 'İpuçları kapalı', '#9fd3ff');
+});
+updateHintBtn();
 
 // PWA: çevrimdışı çalışma (yalnızca http/https üzerinden; dosyadan açınca ve uygulama içinde gerekmez)
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !haptics) {

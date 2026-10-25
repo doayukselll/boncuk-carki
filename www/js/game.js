@@ -178,7 +178,10 @@ function spawnObstacles() {
 // ---------- ipucu: oyuncu bir süre hamle yapmazsa eşleşme getiren bir çevirme gösterilir ----------
 
 let hint, idleSince = 0;   // hint: undefined = henüz aranmadı, null = yok
+let hintsOn = true;        // oyuncu ipuçlarını kapatabilir
+try { hintsOn = localStorage.getItem('boncuk_hints') !== '0'; } catch (e) {}
 function resetHint() { hint = undefined; idleSince = performance.now(); }
+function updateHintBtn() { $('hintBtn').classList.toggle('off', !hintsOn); }
 
 function findHint() {
   for (const k of [1, -1, 2, -2, 3, -3, 4]) for (let r = 0; r < N; r++) {

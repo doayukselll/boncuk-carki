@@ -413,9 +413,9 @@ function drawLogo() {
 
 function loop() {
   if (quake > 0) quake = Math.max(0, quake - 0.05);
-  // oyuncu 5 sn hamle yapmazsa ipucu
-  const idle = !busy && !gameOver && !drag && !aiming && !$('menu').classList.contains('show') &&
-    !$('intro').classList.contains('show') && performance.now() - idleSince > 5000;
+  // oyuncu 10 sn hamle yapmazsa ipucu
+  const idle = hintsOn && !busy && !gameOver && !drag && !aiming && !$('menu').classList.contains('show') &&
+    !$('intro').classList.contains('show') && performance.now() - idleSince > 10000;
   if (idle && hint === undefined) hint = findHint();
   if (!idle && hint) hint = undefined;
   tickCounters();
