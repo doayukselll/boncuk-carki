@@ -120,6 +120,15 @@ const sfx = {
     tone(note(6 + i * 2), 0.3, { vol: 0.06, at: 0.04 });
     vibrate(20);
   },
+  booster() {
+    tone(380, 0.22, { vol: 0.12, slide: 2.4 });
+    noise(0.12, { vol: 0.12, freq: 4000, q: 1.5, at: 0.05 });
+    vibrate(25);
+  },
+  reward() {
+    [0, 4, 7, 12, 16].forEach((s, i) => tone(659.25 * Math.pow(2, s / 12), 0.2, { type: 'triangle', vol: 0.1, at: i * 0.07 }));
+    vibrate([20, 40, 20]);
+  },
   win() {
     [0, 4, 7, 12].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), 0.3, { type: 'triangle', vol: 0.14, at: i * 0.11 }));
     [0, 4, 7].forEach(s => tone(1046.5 * Math.pow(2, s / 12), 0.7, { vol: 0.07, at: 0.48 }));

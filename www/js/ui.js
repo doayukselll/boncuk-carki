@@ -31,7 +31,7 @@ function updateUI() {
   if (score > shownScore) bump($('score').parentElement);
   else tickCounters();
   setStat('best', best);
-  const left = level ? level.moves - moves : moves;
+  const left = level ? movesLeft() : moves;
   setStat('moves', left);
   $('movesStat').classList.toggle('low', !!level && left <= 5 && !gameOver);
   $('movesLabel').textContent = level ? 'Kalan' : 'Hamle';
@@ -40,6 +40,7 @@ function updateUI() {
   $('undo').disabled = busy || gameOver || undos <= 0 || history.length === 0;
   drawNext();
   drawGoals();
+  updateBoosters();
 }
 
 function goalValue(i) {
@@ -177,16 +178,19 @@ function drawMapPath() {
 function showMenu() {
   $('over').classList.remove('show');
   hideIntro();
+  setAim(null);
   const current = buildMenu();
   const sv = loadSave();
   $('resumeBtn').hidden = !sv;
   if (sv) $('resumeBtn').innerHTML = '▶ Devam et<small>' +
     (sv.mode === 'level' ? `Bölüm ${sv.levelIdx + 1}` : `Sonsuz mod · ${sv.st.score} puan`) + '</small>';
   $('menu').classList.add('show');
+  updateChest();
   drawMapPath();
   // bölüm çoksa sıradaki bölüm görünsün diye oraya kaydır
   const m = $('menu');
   m.scrollTop = 0;
   const top = current ? current.offsetTop + $('levels').offsetTop : 0;
   if (current && top > m.clientHeight * 0.6) m.scrollTop = top - m.clientHeight / 2;
+  checkDaily();
 }

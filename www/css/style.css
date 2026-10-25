@@ -62,7 +62,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 button.primary { background: var(--gold); color: #3a2300; font-weight: 800; box-shadow: 0 4px 0 var(--gold-edge), inset 0 2px 0 rgba(255,255,255,0.55); }
 button.primary:active:not(:disabled) { box-shadow: 0 1px 0 var(--gold-edge), inset 0 2px 0 rgba(255,255,255,0.55); }
 
-#wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
+#wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
 #board { touch-action: none; display: block; }
 #hint { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 4px; }
 @media (max-width: 420px) {
@@ -176,6 +176,72 @@ button.primary:active:not(:disabled) { box-shadow: 0 1px 0 var(--gold-edge), ins
 }
 #levels button small { position: absolute; bottom: -13px; font-size: 12px; color: var(--accent); letter-spacing: 0; font-weight: 400; text-shadow: 0 1px 2px #000; }
 #levels button.won small { color: #ffe08a; }
+
+/* yardımcı çubuğu */
+#boosters { display: flex; gap: 8px; justify-content: center; margin: 4px 0 8px; flex: none; }
+#boosters button {
+  position: relative; width: 48px; height: 48px; padding: 0; border-radius: 14px; font-size: 22px; line-height: 1;
+}
+#boosters button b {
+  position: absolute; right: -6px; top: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+  background: #e04b3c; color: #fff; font-size: 12px; line-height: 20px; box-shadow: 0 1px 0 rgba(0,0,0,0.4);
+}
+#boosters button.empty { filter: grayscale(0.8); opacity: 0.6; }
+#boosters button.empty b { background: #5aa83c; }
+#boosters button.active { background: var(--gold); box-shadow: 0 4px 0 var(--gold-edge), 0 0 16px rgba(242,182,50,0.8); animation: aimPulse 0.8s ease-in-out infinite; }
+@keyframes aimPulse { 50% { transform: translateY(-3px); } }
+@media (max-width: 380px) { #boosters { gap: 6px; } #boosters button { width: 44px; height: 44px; font-size: 20px; } }
+#aimTip {
+  position: absolute; top: 4px; left: 50%; transform: translateX(-50%); display: none; z-index: 2; pointer-events: none;
+  background: var(--gold); color: #3a2300; font-weight: 800; font-size: 14px; padding: 6px 14px; border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4); white-space: nowrap;
+}
+#aimTip.show { display: block; animation: fadeIn 0.2s; }
+button.extra { background: linear-gradient(#7be07b, #3f9a2e); color: #fff; font-size: 17px; font-weight: 800; padding: 10px 20px; box-shadow: 0 4px 0 #2a6a1f, inset 0 2px 0 rgba(255,255,255,0.4); }
+
+/* ödül penceresi: hediye kutusu sallanır, eşyalar sırayla çıkar */
+#reward {
+  position: fixed; inset: 0; z-index: 12; background: rgba(8,14,26,0.82);
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+#reward.show { display: flex; animation: fadeIn 0.2s; }
+#reward .gift { font-size: 64px; line-height: 1; animation: giftShake 0.55s ease-in-out; }
+@keyframes giftShake {
+  0% { transform: scale(0.4); } 30% { transform: scale(1.2) rotate(-12deg); }
+  50% { transform: scale(1.1) rotate(12deg); } 70% { transform: rotate(-8deg); } 100% { transform: none; }
+}
+#reward p { margin: -4px 0 0; color: var(--muted); font-size: 14px; }
+#rewardDays { display: flex; gap: 6px; }
+#rewardDays:empty { display: none; }
+#rewardDays span {
+  width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; background: rgba(255,255,255,0.08); color: var(--muted);
+}
+#rewardDays .past { background: rgba(90,168,60,0.5); color: #fff; }
+#rewardDays .today { background: var(--gold); color: #3a2300; transform: scale(1.15); }
+#rewardItems { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#rewardItems .item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 82px; padding: 10px 4px;
+  background: rgba(255,255,255,0.08); border-radius: 14px; animation: itemIn 0.45s cubic-bezier(.3,1.6,.5,1) both;
+}
+#rewardItems .ic { font-size: 32px; line-height: 1.1; }
+#rewardItems b { font-size: 16px; color: var(--accent); }
+#rewardItems small { font-size: 11px; color: var(--muted); }
+@keyframes itemIn { from { transform: scale(0) translateY(20px); opacity: 0; } }
+
+/* menüdeki yıldız sandığı */
+#chestBtn { display: flex; align-items: center; gap: 10px; padding: 8px 14px; width: 260px; max-width: 100%; flex: none; text-align: left; }
+#chestBtn .ic { font-size: 28px; }
+#chestBtn .txt { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+#chestBtn .txt b { font-size: 14px; }
+#chestBtn .bar { height: 8px; border-radius: 4px; background: rgba(0,0,0,0.35); overflow: hidden; }
+#chestBtn .bar i { display: block; height: 100%; background: var(--gold); border-radius: 4px; transition: width 0.5s; }
+#chestBtn .cnt { font-size: 13px; font-weight: 800; color: var(--accent); }
+#chestBtn.ready { background: linear-gradient(#7be07b, #3f9a2e); box-shadow: 0 4px 0 #2a6a1f, inset 0 2px 0 rgba(255,255,255,0.4); }
+#chestBtn.ready .cnt { color: #fff; }
+#chestBtn.ready .ic { animation: giftShake 1.2s ease-in-out infinite; }
+.nope { animation: nope 0.35s; }
+@keyframes nope { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition: none !important; }

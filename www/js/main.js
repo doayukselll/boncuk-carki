@@ -12,6 +12,7 @@ board.addEventListener('pointerdown', e => {
   if (busy || gameOver) return;
   resetHint();
   const p = pointerInfo(e);
+  if (aiming) { aimAt(p); return; }
   if (p.d < geo.hub * 0.8 || p.d > geo.R + geo.w * 0.5) return;
   const ring = Math.max(0, Math.min(N - 1, Math.floor((p.d - geo.hub) / geo.w)));
   if (locks[ring] > 0) {
@@ -58,6 +59,9 @@ $('undo').addEventListener('click', () => {
 $('overMenu').addEventListener('click', showMenu);
 // süren oyun her hamleden sonra kaydedildiği için menüye dönmek bir şey kaybettirmez
 $('menuBtn').addEventListener('click', () => { if (!busy) showMenu(); });
+$('chestBtn').addEventListener('click', openChest);
+$('rewardBtn').addEventListener('click', () => { $('reward').classList.remove('show'); updateChest(); });
+buildBoosterBar();
 $('resumeBtn').addEventListener('click', resumeGame);
 $('soundBtn').addEventListener('click', () => {
   muted = !muted;

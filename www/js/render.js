@@ -234,6 +234,15 @@ function draw() {
     ctx.beginPath(); ctx.arc(cx, cy, hub + (link.r + 1) * w, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
+  // yardımcı nişan modu: çarkın kenarı altın renkte atar
+  if (aiming) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 200);
+    ctx.save();
+    ctx.shadowColor = '#f2b632'; ctx.shadowBlur = 20 * pulse;
+    ctx.strokeStyle = `rgba(242,182,50,${0.5 + 0.5 * pulse})`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(cx, cy, hub + N * w + 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
   // ipucu: önerilen halka yumuşakça parlar
   if (hint) {
     const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
@@ -405,7 +414,7 @@ function drawLogo() {
 function loop() {
   if (quake > 0) quake = Math.max(0, quake - 0.05);
   // oyuncu 5 sn hamle yapmazsa ipucu
-  const idle = !busy && !gameOver && !drag && !$('menu').classList.contains('show') &&
+  const idle = !busy && !gameOver && !drag && !aiming && !$('menu').classList.contains('show') &&
     !$('intro').classList.contains('show') && performance.now() - idleSince > 5000;
   if (idle && hint === undefined) hint = findHint();
   if (!idle && hint) hint = undefined;

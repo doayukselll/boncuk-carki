@@ -34,7 +34,8 @@
     </div>
   </div>
   <div id="goals"></div>
-  <div id="wrap"><canvas id="board"></canvas></div>
+  <div id="wrap"><canvas id="board"></canvas><div id="aimTip"></div></div>
+  <div id="boosters"></div>
   <div id="hint">Bir halkayı sürükleyerek çevir. Merkezden dışa aynı hizada 3 aynı renk = patlar. 🧿 her renge uyar.<br>
     🔒 Kilitli halka dönmez (içinde patlatma kilidi açar) · Taş kabuklu boncuk 2 kez patlar ·<span style="color:#b07cff">⇄</span> Bağlı halkalar ters döner</div>
 </div>
@@ -43,10 +44,21 @@
     <h2 id="overTitle">Çark doldu!</h2>
     <div class="stars" id="overStars"></div>
     <p id="finalText"></p>
+    <button id="overExtra" class="extra" hidden></button>
     <div class="btns">
       <button id="overMenu">Menü</button>
       <button id="overMain" class="primary">Tekrar oyna</button>
     </div>
+  </div>
+</div>
+<div id="reward">
+  <div class="card">
+    <div class="gift">🎁</div>
+    <h2 id="rewardTitle"></h2>
+    <p id="rewardSub"></p>
+    <div id="rewardDays"></div>
+    <div id="rewardItems"></div>
+    <button id="rewardBtn" class="primary">Topla</button>
   </div>
 </div>
 <div id="intro">
@@ -64,6 +76,7 @@
   <p class="sub">Halkaları çevir, renkleri hizala.</p>
   <button class="endless primary" id="resumeBtn"></button>
   <button class="endless primary" id="endlessBtn">∞ Sonsuz mod</button>
+  <button id="chestBtn"><span class="ic">🎁</span><span class="txt"><b>Yıldız sandığı</b><span class="bar"><i></i></span></span><span class="cnt"></span></button>
   <h3>BÖLÜMLER</h3>
   <div id="levels"></div>
 </div>
@@ -74,6 +87,7 @@
 <script src="js/ui.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/render.js"></script>
+<script src="js/boosters.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

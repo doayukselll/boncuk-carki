@@ -1,6 +1,6 @@
 // Çevrimdışı çalışma: dosyalar ilk açılışta önbelleğe alınır.
 // Oyunu güncellediğinde VERSION'ı artır; telefonlar yeni sürümü bir sonraki açılışta alır.
-const VERSION = 'boncuk-v5';
+const VERSION = 'boncuk-v6';
 const FILES = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const FILES = [
   './js/ui.js',
   './js/audio.js',
   './js/render.js',
+  './js/boosters.js',
   './js/main.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

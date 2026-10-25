@@ -11,6 +11,8 @@ let warned = false;             // "dolmak üzere" uyarısı gösterildi mi (tah
 let locks, link, shake, seen;   //locks[r] = kalan kilit hamlesi; link = { r, t } → r ile r+1 ters bağlı
 let mode = 'endless', levelIdx = 0, level = null, cfg = ENDLESS_CFG;
 let progress = [];              // bölüm hedeflerinin sayaçları (hedef sırasıyla)
+let bonusMoves = 0;             // +5 hamle yardımcısıyla eklenen hamleler
+let prizeAt = 1000;             // sonsuz modda bir sonraki ödülün puan eşiği
 let best = 0, bestAtStart = 0, stars = [];
 try { best = +localStorage.getItem('boncuk_best') || 0; } catch (e) {}
 try { stars = JSON.parse(localStorage.getItem('boncuk_stars')) || []; } catch (e) {}
@@ -56,6 +58,8 @@ function newGame() {
   offs = Array(N).fill(0);
   locks = Array(N).fill(0); link = null; shake = Array(N).fill(0); seen = {};
   score = 0; moves = 0; undos = 3; history = []; bestAtStart = best;
+  bonusMoves = 0; prizeAt = 1000;
+  floaters.length = 0; pops.length = 0; waves.length = 0; banner = null;
   busy = false; gameOver = false; particles = []; warned = false;
   resetHint();
   // başlangıç: iç iki halka dolu, üçüncü yarı dolu; hazır eşleşme olmasın
@@ -92,7 +96,7 @@ function restore(st) {
 
 function saveGame() {
   if (gameOver || moves === 0) { clearSave(); return; }
-  const sv = { mode, levelIdx, st: snapshot(), undos, history, seen, bestAtStart };
+  const sv = { mode, levelIdx, st: snapshot(), undos, history, seen, bestAtStart, bonusMoves, prizeAt };
   try { localStorage.setItem('boncuk_save', JSON.stringify(sv)); } catch (e) {}
 }
 function loadSave() {
@@ -113,6 +117,7 @@ function resumeGame() {
   try {
     restore(sv.st);
     undos = sv.undos; history = sv.history; seen = sv.seen; bestAtStart = sv.bestAtStart;
+    bonusMoves = sv.bonusMoves || 0; prizeAt = sv.prizeAt || 1000;
   } catch (e) {   // bozuk ya da eski biçimli kayıt: yeni oyunla devam
     clearSave();
     progress = level ? level.goals.map(() => 0) : [];
@@ -219,6 +224,25 @@ function findMatches() {
   return hit;
 }
 
+// tek boncuğa vuruş: kabukluysa kabuğu kırılır, değilse patlar; hedef sayaçlarına işlenir
+function hitBead(b) {
+  const cracked = b.hp > 1, [x, y] = beadXY(b);
+  if (cracked) { b.hp--; b.crackT = 1; burst(b, '#9a8f7a'); }
+  else { b.pop = 0.001; burst(b); }
+  if (level) level.goals.forEach((g, i) => {
+    if (g.type === 'crack' ? cracked : g.type === 'color' && !cracked && b.c === g.c) {
+      progress[i]++;
+      flyToGoal(x, y, i, cracked ? '#9a8f7a' : COLORS[b.c]);
+    }
+  });
+  return cracked;
+}
+
+function removePopped() {
+  for (let r = 0; r < N; r++) for (let s = 0; s < S; s++)
+    if (grid[r][s] && grid[r][s].pop > 0) grid[r][s] = null;
+}
+
 // boncuklar merkeze doğru düşer
 function gravity() {
   for (let s = 0; s < S; s++) {
@@ -242,18 +266,9 @@ async function cascade(combo) {
     let anyPop = false, anyCrack = false, sx = 0, sy = 0;
     for (const b of m) {
       hitRings.add(b.r);
-      const cracked = b.hp > 1;
-      if (cracked) anyCrack = true; else anyPop = true;
       const [x, y] = beadXY(b);
       sx += x; sy += y;
-      if (cracked) { b.hp--; b.crackT = 1; burst(b, '#9a8f7a'); }
-      else { b.pop = 0.001; burst(b); }
-      if (level) level.goals.forEach((g, i) => {
-        if (g.type === 'crack' ? cracked : g.type === 'color' && !cracked && b.c === g.c) {
-          progress[i]++;
-          flyToGoal(x, y, i, cracked ? '#9a8f7a' : COLORS[b.c]);
-        }
-      });
+      if (hitBead(b)) anyCrack = true; else anyPop = true;
     }
     scorePop(sx / m.size, sy / m.size, '+' + gained, combo);
     // kilitli halkada patlama kilidi bir azaltır
@@ -261,10 +276,10 @@ async function cascade(combo) {
     if (anyPop) sfx.pop(combo);
     if (anyCrack) sfx.crack();
     if (combo > 1) { comboBanner(combo); sfx.combo(combo); }
+    if (combo >= 4 && Math.random() < 0.35) prize();
     updateUI();
     await wait(280);
-    for (let r = 0; r < N; r++) for (let s = 0; s < S; s++)
-      if (grid[r][s] && m.has(grid[r][s]) && grid[r][s].pop > 0) grid[r][s] = null;
+    removePopped();
     gravity();
     await wait(200);
   }
@@ -304,10 +319,11 @@ async function afterMove(snap) {
   // tahta tamamen doluysa ve hiç boşluk yoksa bir sonraki girişte biter; uyar
   busy = false;
   resetHint();
+  checkPrizes();
   updateUI();
   if (level) {
     if (goalsDone()) { winLevel(); return; }
-    if (moves >= level.moves) { endGame('Hamle bitti!'); return; }
+    if (movesLeft() <= 0) { endGame('Hamle bitti!'); return; }
   }
   const free = outerFree();
   if (!free) floatText('Çark dolu! Bir eşleşme yap!', '#ff8a7a');
@@ -315,6 +331,8 @@ async function afterMove(snap) {
   warned = free <= DANGER_FREE;
   saveGame();
 }
+
+function movesLeft() { return level.moves + bonusMoves - moves; }
 
 // sonsuz modda yavaş akış; bölümlerde hedefe yetecek kadar boncuk gelsin diye tahta seyrekse daha çok
 function spawnCount() {
@@ -341,6 +359,7 @@ function showResult(title, starCount, text, mainLabel, mainAction, menuLabel = '
   $('finalText').textContent = text;
   $('overMain').textContent = mainLabel;
   $('overMain').onclick = mainAction;
+  $('overExtra').hidden = true;
   $('over').classList.add('show');
   $('over').classList.toggle('win', !!starCount);
 }
@@ -353,6 +372,7 @@ function endGame(title = 'Çark doldu!') {
   if (level) {
     const left = level.goals.map((g, i) => g.n - Math.min(goalValue(i), g.n)).reduce((a, b) => a + b, 0);
     showResult(title, null, `Hedefe ${left} kaldı. Bir daha dene!`, 'Tekrar dene', () => startGame(levelIdx));
+    if (title === 'Hamle bitti!') offerExtraMoves();
     return;
   }
   const record = score > bestAtStart ? ' · Yeni rekor!' : ` · Rekor: ${best}`;
@@ -362,8 +382,9 @@ function endGame(title = 'Çark doldu!') {
 function winLevel() {
   gameOver = true; busy = false;
   clearSave();
-  const ratio = (level.moves - moves) / level.moves;
-  const st = ratio >= 0.3 ? 3 : ratio >= 0.1 ? 2 : 1;
+  const ratio = movesLeft() / level.moves;
+  // +5 hamleyle bitirilen bölüm tek yıldız alır
+  const st = bonusMoves ? 1 : ratio >= 0.3 ? 3 : ratio >= 0.1 ? 2 : 1;
   stars[levelIdx] = Math.max(stars[levelIdx] || 0, st);
   try { localStorage.setItem('boncuk_stars', JSON.stringify(stars)); } catch (e) {}
   sfx.win();
@@ -371,7 +392,7 @@ function winLevel() {
   updateUI();
   const last = levelIdx === LEVELS.length - 1;
   showResult(last ? 'Tüm bölümler bitti!' : 'Bölüm tamam!', st,
-    `${level.moves - moves} hamle kaldı · Puan: ${score}`,
+    `${movesLeft()} hamle kaldı · Puan: ${score}`,
     last ? 'Sonsuz mod' : 'Sonraki bölüm',
     () => last ? startGame() : startGame(levelIdx + 1));
 }
