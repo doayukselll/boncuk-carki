@@ -47,7 +47,7 @@ function startGame(idx) {
   $('menu').classList.remove('show');
   clearSave();
   newGame();
-  if (level) floatText(`Bölüm ${levelIdx + 1}`, '#9fd3ff');
+  if (level) showIntro();
 }
 
 function newGame() {
@@ -57,6 +57,7 @@ function newGame() {
   locks = Array(N).fill(0); link = null; shake = Array(N).fill(0); seen = {};
   score = 0; moves = 0; undos = 3; history = []; bestAtStart = best;
   busy = false; gameOver = false; particles = []; warned = false;
+  resetHint();
   // başlangıç: iç iki halka dolu, üçüncü yarı dolu; hazır eşleşme olmasın
   for (let s = 0; s < S; s++) {
     const h = s % 2 === 0 ? 3 : 2;
@@ -84,6 +85,7 @@ function restore(st) {
   queue = st.queue.slice(); score = st.score; moves = st.moves; progress = st.progress.slice();
   locks = st.locks.slice(); link = st.link ? { ...st.link } : null;
   offs = Array(N).fill(0);
+  resetHint();
 }
 
 // ---------- kayıt: süren oyun her hamleden sonra saklanır, menüden devam edilir ----------
@@ -168,6 +170,23 @@ function spawnObstacles() {
   }
 }
 
+// ---------- ipucu: oyuncu bir süre hamle yapmazsa eşleşme getiren bir çevirme gösterilir ----------
+
+let hint, idleSince = 0;   // hint: undefined = henüz aranmadı, null = yok
+function resetHint() { hint = undefined; idleSince = performance.now(); }
+
+function findHint() {
+  for (const k of [1, -1, 2, -2, 3, -3, 4]) for (let r = 0; r < N; r++) {
+    if (locks[r] > 0) continue;
+    const q = partnerOf(r);
+    rotateRing(r, k); if (q >= 0) rotateRing(q, -k);
+    const ok = findMatches().size > 0;
+    rotateRing(r, -k); if (q >= 0) rotateRing(q, k);
+    if (ok) return { r, k };
+  }
+  return null;
+}
+
 // ---------- oyun mantığı ----------
 
 function rotateRing(r, k) {
@@ -220,22 +239,28 @@ async function cascade(combo) {
     const gained = m.size * 10 * combo;
     score += gained;
     const hitRings = new Set();
-    let anyPop = false, anyCrack = false;
+    let anyPop = false, anyCrack = false, sx = 0, sy = 0;
     for (const b of m) {
       hitRings.add(b.r);
       const cracked = b.hp > 1;
       if (cracked) anyCrack = true; else anyPop = true;
+      const [x, y] = beadXY(b);
+      sx += x; sy += y;
       if (cracked) { b.hp--; b.crackT = 1; burst(b, '#9a8f7a'); }
       else { b.pop = 0.001; burst(b); }
       if (level) level.goals.forEach((g, i) => {
-        if (g.type === 'crack' ? cracked : g.type === 'color' && !cracked && b.c === g.c) progress[i]++;
+        if (g.type === 'crack' ? cracked : g.type === 'color' && !cracked && b.c === g.c) {
+          progress[i]++;
+          flyToGoal(x, y, i, cracked ? '#9a8f7a' : COLORS[b.c]);
+        }
       });
     }
+    scorePop(sx / m.size, sy / m.size, '+' + gained, combo);
     // kilitli halkada patlama kilidi bir azaltır
     for (const r of hitRings) if (locks[r] > 0 && --locks[r] === 0) sfx.unlock();
     if (anyPop) sfx.pop(combo);
     if (anyCrack) sfx.crack();
-    if (combo > 1) { floatText(`Kombo x${combo}!`); sfx.combo(combo); }
+    if (combo > 1) { comboBanner(combo); sfx.combo(combo); }
     updateUI();
     await wait(280);
     for (let r = 0; r < N; r++) for (let s = 0; s < S; s++)
@@ -278,6 +303,7 @@ async function afterMove(snap) {
 
   // tahta tamamen doluysa ve hiç boşluk yoksa bir sonraki girişte biter; uyar
   busy = false;
+  resetHint();
   updateUI();
   if (level) {
     if (goalsDone()) { winLevel(); return; }
@@ -308,11 +334,15 @@ function outerFree() {
 function showResult(title, starCount, text, mainLabel, mainAction, menuLabel = 'Menü') {
   $('overMenu').textContent = menuLabel;
   $('overTitle').textContent = title;
-  $('overStars').textContent = starCount === null ? '' : '★'.repeat(starCount) + '☆'.repeat(3 - starCount);
+  // yıldızlar tek tek, sesle düşer
+  $('overStars').innerHTML = starCount === null ? '' : [0, 1, 2].map(i =>
+    `<span class="${i < starCount ? 'on' : ''}" style="animation-delay:${0.35 + i * 0.28}s">★</span>`).join('');
+  for (let i = 0; i < (starCount || 0); i++) setTimeout(() => sfx.star(i), 350 + i * 280);
   $('finalText').textContent = text;
   $('overMain').textContent = mainLabel;
   $('overMain').onclick = mainAction;
   $('over').classList.add('show');
+  $('over').classList.toggle('win', !!starCount);
 }
 
 function endGame(title = 'Çark doldu!') {
@@ -337,6 +367,7 @@ function winLevel() {
   stars[levelIdx] = Math.max(stars[levelIdx] || 0, st);
   try { localStorage.setItem('boncuk_stars', JSON.stringify(stars)); } catch (e) {}
   sfx.win();
+  confetti();
   updateUI();
   const last = levelIdx === LEVELS.length - 1;
   showResult(last ? 'Tüm bölümler bitti!' : 'Bölüm tamam!', st,

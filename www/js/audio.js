@@ -115,6 +115,11 @@ const sfx = {
     tone(540, 0.35, { type: 'sine', vol: 0.08, slide: 0.55, at: 0.05 });
     vibrate(25);
   },
+  star(i) {
+    tone(note(4 + i * 2), 0.25, { type: 'triangle', vol: 0.14 });
+    tone(note(6 + i * 2), 0.3, { vol: 0.06, at: 0.04 });
+    vibrate(20);
+  },
   win() {
     [0, 4, 7, 12].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), 0.3, { type: 'triangle', vol: 0.14, at: i * 0.11 }));
     [0, 4, 7].forEach(s => tone(1046.5 * Math.pow(2, s / 12), 0.7, { vol: 0.07, at: 0.48 }));

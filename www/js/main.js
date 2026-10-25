@@ -10,6 +10,7 @@ function pointerInfo(e) {
 
 board.addEventListener('pointerdown', e => {
   if (busy || gameOver) return;
+  resetHint();
   const p = pointerInfo(e);
   if (p.d < geo.hub * 0.8 || p.d > geo.R + geo.w * 0.5) return;
   const ring = Math.max(0, Math.min(N - 1, Math.floor((p.d - geo.hub) / geo.w)));
@@ -71,7 +72,11 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !hap
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 $('endlessBtn').addEventListener('click', () => requestStart());
-window.addEventListener('resize', resize);
+$('intro').addEventListener('pointerdown', hideIntro);
+window.addEventListener('resize', () => {
+  resize();
+  if ($('menu').classList.contains('show')) { buildMenu(); drawMapPath(); }
+});
 
 newGame();
 resize();

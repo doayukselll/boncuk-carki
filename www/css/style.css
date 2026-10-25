@@ -5,6 +5,10 @@
   --text: #f4ead5;
   --muted: #b9ae95;
   --accent: #f2b632;
+  --btn: linear-gradient(#2c4675, #1e335b);
+  --btn-edge: #0b1526;
+  --gold: linear-gradient(#ffd866, #f2a922);
+  --gold-edge: #a8661a;
 }
 * { box-sizing: border-box; }
 html, body {
@@ -25,65 +29,154 @@ html, body {
            calc(4px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
 }
 header { width: 100%; max-width: 520px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-h1 { font-size: 20px; margin: 0; letter-spacing: 1px; color: var(--accent); }
+h1 {
+  font-size: 20px; margin: 0; letter-spacing: 1px; font-weight: 900;
+  background: linear-gradient(#ffe08a, #f2a922); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(0,0,0,0.45));
+}
 .stats { display: flex; gap: 8px; }
-.stat { background: var(--panel); border-radius: 10px; padding: 4px 10px; text-align: center; min-width: 64px; }
-.stat b { display: block; font-size: 18px; }
+.stat {
+  background: linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 0 rgba(0,0,0,0.3);
+  border-radius: 12px; padding: 4px 10px; text-align: center; min-width: 64px;
+}
+.stat b { display: block; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .stat span { font-size: 11px; color: var(--muted); }
+.stat.low { background: linear-gradient(rgba(224,75,60,0.55), rgba(224,75,60,0.25)); animation: lowPulse 1s ease-in-out infinite; }
+@keyframes lowPulse { 50% { box-shadow: 0 0 14px rgba(255,110,90,0.7); } }
 #bar { width: 100%; max-width: 520px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 #next { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 #next canvas { width: 96px; height: 28px; }
+
+/* tok, basılınca çöken düğmeler */
 button {
-  background: var(--panel); color: var(--text); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 10px; padding: 6px 12px; font-size: 14px; cursor: pointer;
+  background: var(--btn); color: var(--text); border: 0;
+  box-shadow: 0 4px 0 var(--btn-edge), inset 0 1px 0 rgba(255,255,255,0.18);
+  border-radius: 12px; padding: 6px 12px; margin-bottom: 4px; font-size: 14px; font-weight: 600; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
 }
+button:hover:not(:disabled) { filter: brightness(1.1); }
+button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--btn-edge), inset 0 1px 0 rgba(255,255,255,0.18); }
 button:disabled { opacity: 0.4; cursor: default; }
+button.primary { background: var(--gold); color: #3a2300; font-weight: 800; box-shadow: 0 4px 0 var(--gold-edge), inset 0 2px 0 rgba(255,255,255,0.55); }
+button.primary:active:not(:disabled) { box-shadow: 0 1px 0 var(--gold-edge), inset 0 2px 0 rgba(255,255,255,0.55); }
+
 #wrap { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
 #board { touch-action: none; display: block; }
 #hint { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 4px; }
-#over {
-  position: fixed; inset: 0; background: rgba(8,14,26,0.82);
-  display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px;
-}
-#over.show { display: flex; }
 @media (max-width: 420px) {
   h1 { font-size: 15px; }
   .stat { min-width: 52px; padding: 4px 6px; }
   .stat b { font-size: 15px; }
   #undo .lbl { display: none; }
 }
-button { white-space: nowrap; }
-#over h2 { margin: 0; font-size: 30px; color: var(--accent); }
-#over p { margin: 0; color: var(--muted); }
-#over .stars { font-size: 36px; letter-spacing: 6px; color: var(--accent); min-height: 44px; }
-#over .btns { display: flex; gap: 10px; }
-#over button { font-size: 18px; padding: 10px 24px; }
-button.primary { background: var(--accent); color: #1a1a1a; border: 0; }
 .barRight { display: flex; gap: 6px; }
+
+/* sayaç/çip değişince kısa bir zıplama */
+.bump { animation: bump 0.32s cubic-bezier(.3,1.6,.5,1); }
+@keyframes bump { 40% { transform: scale(1.18); } }
+
 #goals { width: 100%; max-width: 520px; display: none; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 #goals.show { display: flex; }
 #goals .lvl { font-size: 13px; color: var(--muted); margin-right: 4px; }
-.goal { display: flex; align-items: center; gap: 6px; background: var(--panel); border-radius: 999px; padding: 4px 10px 4px 4px; font-size: 14px; }
-.goal.done { outline: 2px solid #5aa83c; }
+.goal {
+  display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 10px 4px 4px; font-size: 14px; font-weight: 700;
+  background: linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0.04)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+  font-variant-numeric: tabular-nums;
+}
+.goal.done { background: linear-gradient(#6cc04a, #3f8a2a); color: #fff; }
 .goal .dot { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
-.goal .dot.sym { color: rgba(0,0,0,0.5); font-size: 11px; line-height: 1; }
+.goal .dot.sym { color: rgba(0,0,0,0.5); font-size: 11px; line-height: 1; box-shadow: inset -2px -3px 0 rgba(0,0,0,0.2), inset 2px 2px 0 rgba(255,255,255,0.35); }
 .goal .dot.shell { background: rgba(200,190,170,0.25); border: 3px solid #9a8f7a; }
 .goal .dot.star { background: transparent; color: var(--accent); font-size: 16px; }
+
+/* hedefe uçan boncuk */
+.fly {
+  position: fixed; z-index: 5; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff 0, var(--c) 30%, var(--c) 60%, rgba(0,0,0,0.35) 100%);
+  box-shadow: 0 0 10px var(--c);
+}
+
+/* açılır kartlar: bitiş ekranı ve bölüm girişi */
+#over, #intro {
+  position: fixed; inset: 0; background: rgba(8,14,26,0.78);
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+#over { z-index: 10; }  /* menünün üstünde de açılabilsin (yeni oyun onayı) */
+#intro { z-index: 9; cursor: pointer; }
+#over.show, #intro.show { display: flex; animation: fadeIn 0.2s; }
+.card {
+  display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
+  background: linear-gradient(#21386180, #142441e6), var(--bg2);
+  border: 2px solid rgba(242,182,50,0.45); border-radius: 22px; padding: 22px 26px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12);
+  max-width: 100%;
+}
+.show > .card { animation: cardIn 0.42s cubic-bezier(.3,1.5,.5,1); }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes cardIn { from { transform: scale(0.6) translateY(30px); opacity: 0; } }
+.card h2 { margin: 0; font-size: 30px; font-weight: 900; color: var(--accent); text-shadow: 0 3px 0 rgba(0,0,0,0.4); }
+#over p { margin: 0; color: var(--muted); }
+#over .stars { font-size: 46px; letter-spacing: 6px; min-height: 0; display: flex; gap: 4px; }
+#over .stars:empty { display: none; }
+#over .stars span { color: rgba(255,255,255,0.15); display: inline-block; }
+#over .stars span.on { color: var(--accent); text-shadow: 0 0 18px rgba(242,182,50,0.8); animation: starIn 0.5s cubic-bezier(.3,1.7,.5,1) both; }
+#over .stars span:nth-child(2) { transform: translateY(-10px); font-size: 1.15em; }
+#over .stars span:nth-child(2).on { animation-name: starInMid; }
+@keyframes starIn { from { transform: scale(3) rotate(-40deg); opacity: 0; } }
+@keyframes starInMid { from { transform: translateY(-10px) scale(3) rotate(-40deg); opacity: 0; } to { transform: translateY(-10px); } }
+#over .btns { display: flex; gap: 10px; }
+#over button { font-size: 18px; padding: 10px 24px; }
+#intro .label { font-size: 12px; letter-spacing: 2px; color: var(--muted); font-weight: 700; margin-bottom: -4px; }
+#introGoals { display: flex; flex-direction: column; gap: 8px; }
+#introGoals .goal { font-size: 18px; padding: 6px 16px 6px 6px; }
+#introGoals .goal .dot { width: 30px; height: 30px; font-size: 16px; }
+#intro p { margin: 0; font-weight: 700; }
+#intro small { color: var(--muted); font-size: 12px; }
+
+.confetti {
+  position: fixed; top: -12px; z-index: 11; width: 9px; height: 14px; border-radius: 2px; pointer-events: none;
+  animation: fall linear both;
+}
+@keyframes fall { to { transform: translate(var(--dx), 105vh) rotate(var(--r)); } }
+
+/* ana menü ve bölüm haritası */
 #menu {
-  position: fixed; inset: 0; background: radial-gradient(ellipse at center, var(--bg2), var(--bg) 70%);
+  position: fixed; inset: 0; background: radial-gradient(ellipse at top, var(--bg2), var(--bg) 70%);
   display: none; flex-direction: column; align-items: center; gap: 18px; overflow-y: auto;
-  padding: calc(32px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  padding: calc(24px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
 }
 #menu.show { display: flex; }
-#menu h1 { font-size: 32px; }
+#logo { width: 120px; height: 120px; flex: none; margin-bottom: -8px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4)); }
+#menu h1 { font-size: 34px; animation: float 3s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-4px); } }
 #menu .sub { color: var(--muted); margin: -10px 0 0; font-size: 14px; }
-#menu .endless { font-size: 18px; padding: 12px 28px; }
-#resumeBtn small { display: block; font-size: 12px; opacity: 0.75; }
-#resumeBtn ~ #endlessBtn { background: var(--panel); color: var(--text); border: 1px solid rgba(255,255,255,0.15); }
-#resumeBtn[hidden] ~ #endlessBtn { background: var(--accent); color: #1a1a1a; border: 0; }
-#over { z-index: 10; }  /* menünün üstünde de açılabilsin (yeni oyun onayı) */
-#menu h3 { margin: 6px 0 0; color: var(--muted); font-weight: 600; font-size: 14px; letter-spacing: 1px; }
-#levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; width: 100%; max-width: 380px; }
-#levels button { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; font-size: 20px; font-weight: 700; }
-#levels button.current { outline: 2px solid var(--accent); outline-offset: 2px; }
-#levels button small { font-size: 11px; color: var(--accent); letter-spacing: 1px; font-weight: 400; }
+#menu .endless { font-size: 18px; padding: 12px 28px; flex: none; }
+#resumeBtn small { display: block; font-size: 12px; opacity: 0.75; font-weight: 600; }
+#resumeBtn:not([hidden]) ~ #endlessBtn { background: var(--btn); color: var(--text); box-shadow: 0 4px 0 var(--btn-edge), inset 0 1px 0 rgba(255,255,255,0.18); }
+#menu h3 { margin: 6px 0 0; color: var(--muted); font-weight: 700; font-size: 14px; letter-spacing: 2px; }
+#levels { position: relative; display: flex; flex-direction: column; gap: 22px; width: 100%; max-width: 380px; padding: 8px 0 40px; flex: none; }
+#levels svg { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+#levels .road { fill: none; stroke: rgba(0,0,0,0.35); stroke-width: 22; stroke-linecap: round; }
+#levels .dash { fill: none; stroke: rgba(244,234,213,0.18); stroke-width: 4; stroke-dasharray: 2 12; stroke-linecap: round; }
+#levels .trail { fill: none; stroke: rgba(242,182,50,0.55); stroke-width: 6; stroke-linecap: round; }
+#levels button {
+  position: relative; width: 62px; height: 62px; border-radius: 50%; padding: 0; margin: 0;
+  margin-left: calc(50% - 31px + var(--x) * (100% - 62px));
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 900; line-height: 1;
+}
+#levels button:disabled { opacity: 1; background: linear-gradient(#2a3346, #1b2232); color: rgba(255,255,255,0.4); font-size: 18px; }
+#levels button.won { background: var(--gold); color: #3a2300; box-shadow: 0 4px 0 var(--gold-edge), inset 0 2px 0 rgba(255,255,255,0.55); }
+#levels button.current { background: linear-gradient(#5fd0ff, #2a86d6); color: #fff; box-shadow: 0 4px 0 #165a97, inset 0 2px 0 rgba(255,255,255,0.5); animation: nodePulse 1.4s ease-in-out infinite; }
+@keyframes nodePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(95,208,255,0.9)); }
+}
+#levels button small { position: absolute; bottom: -13px; font-size: 12px; color: var(--accent); letter-spacing: 0; font-weight: 400; text-shadow: 0 1px 2px #000; }
+#levels button.won small { color: #ffe08a; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+}

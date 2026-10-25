@@ -5,23 +5,53 @@
 const floaters = [];
 function floatText(t, color = '#f2b632') { floaters.push({ t, color, life: 1 }); }
 
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const waves = [];      // patlayan boncuktan yayılan halka
+const pops = [];       // eşleşmenin üstünde yükselen "+puan"
+let banner = null;     // ortada beliren kombo övgüsü
+let quake = 0;         // ekran sarsıntısı (0..1)
+
+const PRAISE = ['', '', 'Güzel!', 'Harika!', 'Muhteşem!', 'İnanılmaz!'];
+const PRAISE_COLORS = ['', '', '#9fd3ff', '#7be07b', '#f2b632', '#ff7ad1'];
+
+function scorePop(x, y, t, combo) { pops.push({ x, y, t, life: 1, big: combo > 1 }); }
+function comboBanner(combo) {
+  const i = Math.min(combo, PRAISE.length - 1);
+  banner = { t: PRAISE[i], sub: `Kombo x${combo}`, col: PRAISE_COLORS[i], life: 1 };
+  if (!reduceMotion) quake = Math.min(1, 0.25 + combo * 0.15);
+}
+
+const easeOutBack = t => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+
+// ipucu halkası, dönüş yönüne doğru kısa aralıklarla kıpırdar
+function hintWiggle(r) {
+  if (!hint || drag) return 0;
+  const sign = r === hint.r ? 1 : partnerOf(hint.r) === r ? -1 : 0;
+  if (!sign) return 0;
+  const t = (performance.now() - idleSince) % 1600;
+  return t < 600 ? Math.sin(t / 600 * Math.PI * 3) * 0.09 * Math.sign(hint.k) * sign : 0;
+}
+
 function ringOff(r) {
-  return offs[r] + Math.sin(shake[r] * 30) * 0.12 * shake[r];
+  return offs[r] + Math.sin(shake[r] * 30) * 0.12 * shake[r] + hintWiggle(r);
 }
 function beadPos(b, s) {
   const ang = (s + ringOff(b.r)) * 2 * Math.PI / S - Math.PI / 2;
   const rad = geo.hub + (b.vr + 0.5) * geo.w;
   return [geo.cx + Math.cos(ang) * rad, geo.cy + Math.sin(ang) * rad];
 }
+function beadXY(b) {
+  for (let s = 0; s < S; s++) if (grid[b.r][s] === b) return beadPos(b, s);
+  return [geo.cx, geo.cy];
+}
 function burst(b, color) {
-  for (let r = 0; r < N; r++) for (let s = 0; s < S; s++) if (grid[r][s] === b) {
-    const [x, y] = beadPos(b, s);
-    const col = color || (b.c === JOKER ? '#2f7bff' : COLORS[b.c]);
-    for (let i = 0; i < 10; i++) {
-      const a = Math.random() * Math.PI * 2, v = 1 + Math.random() * 3;
-      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, col });
-    }
+  const [x, y] = beadXY(b);
+  const col = color || (b.c === JOKER ? '#2f7bff' : COLORS[b.c]);
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 4;
+    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, col, sz: 2 + Math.random() * 3 });
   }
+  waves.push({ x, y, life: 1, col });
 }
 
 // ---------- çizim ----------
@@ -155,6 +185,8 @@ function drawStar(x, y, r) {
 function draw() {
   const { cx, cy, R, hub, w } = geo;
   ctx.clearRect(0, 0, board.width, board.height);
+  ctx.save();
+  if (quake > 0) ctx.translate((Math.random() - 0.5) * quake * 10, (Math.random() - 0.5) * quake * 10);
 
   // halka zeminleri
   for (let r = N - 1; r >= 0; r--) {
@@ -202,6 +234,18 @@ function draw() {
     ctx.beginPath(); ctx.arc(cx, cy, hub + (link.r + 1) * w, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
+  // ipucu: önerilen halka yumuşakça parlar
+  if (hint) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+    ctx.save();
+    ctx.shadowColor = '#fff3c4'; ctx.shadowBlur = 18 * pulse;
+    ctx.strokeStyle = `rgba(255,243,196,${0.25 + 0.45 * pulse})`; ctx.lineWidth = 3;
+    for (const r of [hint.r, partnerOf(hint.r)]) if (r >= 0) {
+      ctx.beginPath(); ctx.arc(cx, cy, hub + (r + 1) * w - 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, hub + r * w + 2, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
   // ışınlar
   ctx.strokeStyle = 'rgba(244,234,213,0.07)'; ctx.lineWidth = geo.br * 2.2;
   ctx.lineCap = 'round';
@@ -223,8 +267,12 @@ function draw() {
     const b = grid[r][s];
     if (!b) continue;
     b.vr += (b.r - b.vr) * 0.25;
-    if (b.sc < 1) b.sc = Math.min(1, b.sc + 0.08);
-    let rad = geo.br * b.sc, alpha = 1;
+    // düşüş bitince küçük bir sekme
+    if (Math.abs(b.r - b.vr) > 0.05) b.falling = true;
+    else if (b.falling) { b.falling = false; b.land = 1; }
+    if (b.sc < 1) b.sc = Math.min(1, b.sc + 0.07);
+    let rad = geo.br * easeOutBack(b.sc), alpha = 1;
+    if (b.land > 0) { rad *= 1 + 0.16 * Math.sin(b.land * Math.PI); b.land = Math.max(0, b.land - 0.09); }
     if (b.pop > 0) { b.pop = Math.min(1, b.pop + 0.07); rad *= 1 + b.pop * 0.5; alpha = 1 - b.pop; }
     const [x, y] = beadPos(b, s);
     drawBead(ctx, b.c, x, y, rad, alpha);
@@ -257,15 +305,63 @@ function draw() {
     ctx.restore();
   }
 
+  // şok dalgaları
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const v = waves[i];
+    v.life -= 0.06;
+    if (v.life <= 0) { waves.splice(i, 1); continue; }
+    ctx.globalAlpha = v.life * 0.8; ctx.strokeStyle = v.col; ctx.lineWidth = 3 * v.life + 1;
+    ctx.beginPath(); ctx.arc(v.x, v.y, geo.br * (1 + (1 - v.life) * 1.6), 0, Math.PI * 2); ctx.stroke();
+  }
   // parçacıklar
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; p.life -= 0.03;
+    p.x += p.vx; p.y += p.vy; p.vx *= 0.93; p.vy = p.vy * 0.93 + 0.12; p.life -= 0.028;
     if (p.life <= 0) { particles.splice(i, 1); continue; }
     ctx.globalAlpha = p.life; ctx.fillStyle = p.col;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 3 * p.life + 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, (p.sz || 3) * p.life + 1, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // +puan yazıları
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const p = pops[i];
+    p.life -= 0.018;
+    if (p.life <= 0) { pops.splice(i, 1); continue; }
+    const age = 1 - p.life, sc = age < 0.12 ? easeOutBack(age / 0.12) : 1;
+    const size = Math.max(1, Math.round(geo.br * (p.big ? 1.3 : 1) * sc));
+    ctx.globalAlpha = Math.min(1, p.life * 2.5);
+    ctx.font = `900 ${size}px Segoe UI, sans-serif`;
+    const y = p.y - age * geo.w * 0.9;
+    ctx.lineWidth = Math.max(2, size * 0.18); ctx.strokeStyle = 'rgba(15,27,46,0.85)';
+    ctx.strokeText(p.t, p.x, y);
+    ctx.fillStyle = p.big ? '#f2b632' : '#fff'; ctx.fillText(p.t, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+
+  // kombo övgüsü: büyüyerek gelir, kısa durur, yükselip söner
+  if (banner) {
+    banner.life -= 0.014;
+    if (banner.life <= 0) banner = null;
+    else {
+      const age = 1 - banner.life;
+      const sc = age < 0.18 ? easeOutBack(age / 0.18) : 1;
+      const size = Math.max(1, Math.round(R * 0.2 * sc));
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, banner.life * 3);
+      ctx.translate(cx, cy - Math.max(0, age - 0.6) * R * 0.3);
+      ctx.rotate(-0.06);
+      ctx.font = `900 ${size}px Segoe UI, sans-serif`;
+      ctx.lineWidth = size * 0.16; ctx.strokeStyle = '#0f1b2e'; ctx.strokeText(banner.t, 0, 0);
+      ctx.fillStyle = banner.col; ctx.fillText(banner.t, 0, 0);
+      ctx.font = `800 ${Math.round(size * 0.38)}px Segoe UI, sans-serif`;
+      ctx.lineWidth = size * 0.1; ctx.strokeText(banner.sub, 0, size * 0.72);
+      ctx.fillStyle = '#fff'; ctx.fillText(banner.sub, 0, size * 0.72);
+      ctx.restore();
+    }
+  }
+  ctx.textBaseline = 'alphabetic';
 
   // yazılar
   for (let i = floaters.length - 1; i >= 0; i--) {
@@ -278,6 +374,7 @@ function draw() {
     ctx.fillText(f.t, cx, cy - R * 0.55 - (1 - f.life) * 30 + i * geo.R * 0.13);
   }
   ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawNext() {
@@ -289,7 +386,31 @@ function drawNext() {
   });
 }
 
+// menüdeki dönen çark logosu
+const logo = document.getElementById('logo');
+const lctx = logo.getContext('2d');
+function drawLogo() {
+  const sz = logo.width, c = sz / 2, t = performance.now() / 1000;
+  lctx.clearRect(0, 0, sz, sz);
+  for (let k = 0; k < 2; k++) {
+    const rad = sz * (k ? 0.4 : 0.25), n = k ? 10 : 6, dir = k ? 1 : -1.4;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + t * 0.4 * dir;
+      drawBead(lctx, (i + k * 3) % 7, c + Math.cos(a) * rad, c + Math.sin(a) * rad, sz * (k ? 0.075 : 0.07));
+    }
+  }
+  drawBead(lctx, JOKER, c, c, sz * 0.1 * (1 + 0.05 * Math.sin(t * 3)));
+}
+
 function loop() {
+  if (quake > 0) quake = Math.max(0, quake - 0.05);
+  // oyuncu 5 sn hamle yapmazsa ipucu
+  const idle = !busy && !gameOver && !drag && !$('menu').classList.contains('show') &&
+    !$('intro').classList.contains('show') && performance.now() - idleSince > 5000;
+  if (idle && hint === undefined) hint = findHint();
+  if (!idle && hint) hint = undefined;
+  tickCounters();
+  if ($('menu').classList.contains('show')) drawLogo();
   for (let r = 0; r < N; r++) {
     if (shake[r] > 0) shake[r] = Math.max(0, shake[r] - 0.04);
     if (drag && (drag.ring === r || partnerOf(drag.ring) === r)) continue;
